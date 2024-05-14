@@ -1,0 +1,46 @@
+---
+title: "Johnson Creek"
+author: "Ryan N. Kinzer"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r list-files}
+stream <- 'Johnson Creek'
+
+files <- list.files('../figures/trib_figures/')
+stream_files <- files[which(grepl(stream, files))]
+```
+
+```{r plot-figures, eval = FALSE}
+for(i in 1:length(stream_files)){
+  file_name <- paste0('../figures/trib_figures/',stream_files[i])
+  print(file_name)
+  knitr::include_graphics(paste0('../figures/trib_figures/',stream_files[i]))
+}
+```
+
+
+```{r plot-binomial}
+  knitr::include_graphics(paste0('../figures/trib_figures/',stream_files[1]))
+```
+
+```{r plot-multinomial}
+  knitr::include_graphics(paste0('../figures/trib_figures/',stream_files[2]))
+```
+
+```{r plot-sar, out.width = "80%"}
+  knitr::include_graphics(paste0('../figures/trib_figures/',stream_files[3]))
+```
+
+```{r plot-emigrant, out.width = "80%"}
+  knitr::include_graphics(paste0('../figures/trib_figures/',stream_files[4]))
+```
+
+```{r plot-smolt, out.width = "80%"}
+  knitr::include_graphics(paste0('../figures/trib_figures/',stream_files[5]))
+```

@@ -1,0 +1,682 @@
+---
+title: "Lostine River Hatchery Program Evaluation"
+author:
+- Ryan N. Kinzer:
+    email: ryank@nezperce.org
+    #institute: npt_mccall
+    correspondence: yes
+- Brian Simmons:
+    email: brians@nezperce.org
+    #institute: npt_mccall
+    correspondence: no
+- Shane Vatland:
+    email: shanev@nezperce.org
+    #institute: npt_mccall
+    correspondence: no
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  bookdown::html_document2:
+    theme: cerulean
+    toc: yes
+    toc_depth: 3
+    toc_float:
+      collapsed: yes
+      smooth_scroll: yes
+    number_sections: yes
+    pandoc_args:
+    - "--lua-filter=../templates/scholarly-metadata.lua"
+    - "--lua-filter=../templates/author-info-blocks.lua"
+    - "--lua-filter=../templates/pagebreak.lua"
+institute:
+- npt_mccall: Nez Perce Tribe, Department of Fisheries Resources Management, 14054 Burr Dr., McCall, Idaho, 83638, USA
+csl: "../templates/journal-of-archaeological-science.csl"
+#bibliography: hatchery_model.bib
+always_allow_html: yes
+---
+
+<!-- the following inserts the NPT logo into header -->
+```{=html}
+<script>
+   $(document).ready(function() {
+     $head = $('#header');
+     $head.prepend('<img src=\"NPT.png\" style=\"float: right;width: 150px;\"/>')
+     $head.prepend('<img src=\"DFRM.png\" style=\"float: right;width: 150px;\"/>')
+   });
+</script>
+
+<style>
+p.caption {
+  font-size: 0.8em;
+}
+</style>
+```
+
+```{r setup, echo = FALSE, message = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  echo = FALSE,
+  comment = "#>",
+  fig.path = "../figures/",
+  dpi = 600
+)
+
+options(knitr.kable.NA = '--')
+
+library(knitr)
+library(kableExtra)
+```
+
+
+```{r load-pkgs}
+# load pkgs and functions
+library(tidyverse)
+library(lme4)
+library(nnet)
+library(ggeffects)
+source(here::here("R","predict_BH.R"))
+source(here::here("R","predict_Ricker.R"))
+source(here::here("R","fit_BH.R"))
+source(here::here("R","fit_Ricker.R"))
+source(here::here("R","life_cycle.R"))
+```
+
+```{r load-data}
+dat <- readxl::read_excel(here::here("data", "trib_data", "lostine.xlsx")) %>%
+  mutate(across(.cols = everything(), as.numeric))
+```
+
+
+# Background
+
+Returning natural-origin and hatchery-origin Chinook Salmon to the Lostine River are intercepted by a permanent trapping facility. After each fish is captured, facility staff decide to release the fish either upstream to spawn naturally, or to keep them for future use as brood stock or as an outplant to downstream tributaries to the Wallowa River. The decision to release the fish upstream or to keep them is guided by a weir management sliding scale that seeks to balance the contributions of natural-origin fish to hatchery production, and hatchery-origin fish to natural production at various escapement levels. We initiated this work to more thoroughly understand the impacts of the weir management sliding scale on total returns and allotted harvest. Because the weir sliding scale limits the number or proportion of hatchery origin spawners (pHOS) we hypothesized removing the constraint of pHOS would increase natural production and total returns to the Lostine River, and ultimately a greater number of fish available for harvest.
+
+We developed a life-cycle simulation model to examine differences in escapement and harvest under five management scenarios. The first scenario follows our current baseline conditions with an integrated hatchery program of 175 brood stock with spawner composition determined by the weir management sliding scale, and harvest being implemented at the maximum allowed level determined by harvest sliding scales. The second scenario used the weir sliding scale to determine the same number of natural-origin broodstock as scenario 1, but differed by allowing an unconstrained pHOS (i.e., all remaining hatchery origin fish were allowed to spawn naturally). The third scenario used the same weir sliding scale as scenario 1 to determine brood stock and naturally spawning composition but didn't allow harvest (i.e., set harvest to zero). The forth and fifth scenarios eliminated the hatchery program and assumed all fish spawned naturally and only differed by either allowing harvest or excluding harvest.
+
+# Results and Conclusions
+
+1. Under the current baseline conditions the model stabilizes at:
+  1. 1,500 hatchery-origin fish and 500 natural-origin fish returning,
+  1. harvest or natural-origin adults is 19, and 150 hatchery-origin adults are harvested.
+1. Hatchery-origin escapement is unchanged when the weir management sliding scale is removed, or when harvest is not allowed.
+1. Natural-origin escapement is approximately 250 individuals without the hatchery program (i.e., half the return with the hatchery program).
+1. Zero harvest occurs without the hatchery program.
+
+
+```{r load-models}
+sr_mod <- readRDS(file = here::here('data', 'lostine_mods', 'lostine_smolt_mod.rds'))
+sar_mod <- readRDS(file = here::here('data', 'lostine_mods', 'lostine_sar_mod.rds'))
+age_mod <- readRDS(file = here::here('data', 'lostine_mods', 'lostine_age_mod.rds'))
+
+N0 <- 150 # natural escapement (with jacks) at time = 0
+H0 <- 10 # hatchery escapement (with jacks) at time = 0
+viable <- 500 # MAT; in case of Lostine its 1000/2 b/c half the fish go into Lostine
+years <- 25
+stochastic <- FALSE
+Npsp <- 0 # prespawn mortality in nature
+Hpsp <- 0 # hatchery pre-spawn mortality rate
+brood_take <- 175
+BS_smolt_mu <- 6.8 #ratio of hatchery smolts at LGR to brood stock spawned (log scale)
+BS_smolt_sd <- .44
+reproduction_age <- 2 # ocean age of mature adult
+```
+
+```{r current-harvest}
+current_harvest <- life_cycle(
+  N0 = N0,
+  H0 = H0,
+  viable = viable,
+  years = years,
+  harvest = TRUE,
+  stochastic = stochastic,
+  sr_model = sr_mod,
+  sr_type = 'Beverton-Holt',
+  sar_model = sar_mod,
+  age_model = age_mod,
+  Npsp = Npsp,
+  Hpsp = Hpsp,
+  brood_take = brood_take,
+  sliding_scale = TRUE,
+  pNOB = 'min',
+  max_pHOS = NULL,
+  BS_smolt_mu = BS_smolt_mu, 
+  BS_smolt_sd = BS_smolt_sd,
+  reproduction_age = reproduction_age
+  ) %>%
+  mutate(by = 1:n(),
+         model = 'current-harvest')
+```
+
+
+```{r current-harvest-no-slide}
+current_harvest_no_slide <- life_cycle(
+  N0 = N0,
+  H0 = H0,
+  viable = viable,
+  years = years,
+  harvest = TRUE,
+  stochastic = stochastic,
+  sr_model = sr_mod,
+  sr_type = 'Beverton-Holt',
+  sar_model = sar_mod,
+  age_model = age_mod,
+  Npsp = Npsp,
+  Hpsp = Hpsp,
+  brood_take = brood_take,
+  sliding_scale = FALSE,
+  pNOB = 'min',
+  max_pHOS = 1,
+  BS_smolt_mu = BS_smolt_mu, 
+  BS_smolt_sd = BS_smolt_sd,
+  reproduction_age = reproduction_age
+  ) %>%
+  mutate(by = 1:n(),
+         model = 'current-harvest-no-slide')
+```
+
+
+```{r current-no-harvest}
+current_no_harvest <- life_cycle(
+  N0 = N0,
+  H0 = H0,
+  viable = viable,
+  years = years,
+  harvest = FALSE,
+  stochastic = stochastic,
+  sr_model = sr_mod,
+  sr_type = 'Beverton-Holt',
+  sar_model = sar_mod,
+  age_model = age_mod,
+  Npsp = Npsp,
+  Hpsp = Hpsp,
+  brood_take = brood_take,
+  sliding_scale = TRUE,
+  pNOB = 'min',
+  max_pHOS = NULL,
+  BS_smolt_mu = BS_smolt_mu, 
+  BS_smolt_sd = BS_smolt_sd,
+  reproduction_age = reproduction_age
+  ) %>%
+  mutate(by = 1:n(),
+         model = 'current-no-harvest')
+```
+
+
+```{r no-hat-harvest}
+no_hat_harvest <- life_cycle(
+  N0 = N0,
+  H0 = 0,
+  viable = viable,
+  years = years,
+  harvest = TRUE,
+  stochastic = stochastic,
+  sr_model = sr_mod,
+  sr_type = 'Beverton-Holt',
+  sar_model = sar_mod,
+  age_model = age_mod,
+  Npsp = Npsp,
+  Hpsp = Hpsp,
+  brood_take = 0,
+  sliding_scale = TRUE,
+  pNOB = 'min',
+  max_pHOS = NULL,
+  BS_smolt_mu = BS_smolt_mu, 
+  BS_smolt_sd = BS_smolt_sd,
+  reproduction_age = reproduction_age
+  ) %>%
+  mutate(by = 1:n(),
+         model = 'no-hat-harvest')
+```
+
+
+```{r no-hat-no-harvest}
+no_hat_no_harvest <- life_cycle(
+  N0 = N0,
+  H0 = 0,
+  viable = viable,
+  years = years,
+  harvest = FALSE,
+  stochastic = stochastic,
+  sr_model = sr_mod,
+  sr_type = 'Beverton-Holt',
+  sar_model = sar_mod,
+  age_model = age_mod,
+  Npsp = Npsp,
+  Hpsp = Hpsp,
+  brood_take = 0,
+  sliding_scale = TRUE,
+  pNOB = 'min',
+  max_pHOS = NULL,
+  BS_smolt_mu = BS_smolt_mu, 
+  BS_smolt_sd = BS_smolt_sd,
+  reproduction_age = reproduction_age
+  ) %>%
+  mutate(by = 1:n(),
+         model = 'no-hat-no-harvest')
+```
+
+
+```{r model-plots, fig.cap = 'Lostine River escapement under five different scenarios.'}
+mod_results <- bind_rows(current_harvest, current_harvest_no_slide) %>%
+  bind_rows(current_no_harvest) %>%
+  bind_rows(no_hat_harvest) %>%
+  bind_rows(no_hat_no_harvest)
+
+mod_results %>%
+  ggplot(aes(x = by)) +
+  geom_line(aes(y = nat_esc, colour = 'NOR')) +
+  geom_line(aes(y = hat_esc, colour = 'HOR')) +
+  geom_line(aes(y = nat_harvest, colour = 'NOR Harvest')) +
+  geom_line(aes(y = hat_harvest, colour = 'HOR Harvest')) +
+  facet_wrap(~model, ncol = 2) +
+  theme_bw() +
+  theme(legend.position = c(.75, .10),
+        legend.background = element_rect(colour = 'black')) +
+  labs(x = 'Time',
+       y = 'Escapement (inc. jacks)',
+       colour = 'Metric')
+```
+# Methods
+
+## Life-cycle Model
+
+The life-cycle model for the Lostine River incorporates 5 life stages and utilizes a Monte-Carlo simulation to randomly sample possible outcomes from probability distributions for each life-stage. The individual life stages include:
+
+1. Tributary escapement to weir escapement influenced by available harvest rates.
+1. Weir escapement to broodstock and released upstream dictated by weir management sliding scales.
+1. Broodstock and released upstream to successful hatchery and natural spawners influenced by pre-spawn mortality rates.
+1. Spawners to smolt surviving to Lower Granite Dam and governed by observed stock-recruit functions.
+1. Smolts to tributary escapement governed by observed SARs.
+
+Assumed probability distributions were parameterized with Lostine River juvenile, adult, and survival data collected during the last 23 years (1995-2018). Parameter estimates used in the life-cycle model are shown in the following section.
+
+## Parameter Estimates
+
+### Emigrant Productivity
+Juvenile emigrant productivity was estimated from the abundance of parr leaving the Lostine River and the estimated number of spawners.
+
+```{r fit-emigration-BH, tab.cap='Beverton-Holt alpha and beta parameter estimates for emigrants at the Lostine River screw trap recruiting from spawning natural and hatchery origin spawners.'}
+# fit emigration models ----
+bh_emig_mod <- fit_BH(stock = dat$nat_spawners + dat$hat_spawners, recruits = dat$nat_emig, inits = list(350, .0005))
+
+bh_emig_mod %>%
+  broom::tidy() %>%
+  mutate(
+    p.value = scales::pvalue(p.value),
+  ) %>%
+  kable(
+    col.names = c("Parameter", "Estimate", "SE", "t-statistic", "p-value"),
+    digits = c(0, 5, 5, 2, 3)
+  ) %>%
+  kable_styling(bootstrap_options = 'striped')
+```
+
+```{r fit-emigration-Ricker}
+r_emig_mod <- fit_Ricker(stock = dat$nat_spawners + dat$hat_spawners, recruits = dat$nat_emig, inits = list(300, .0018))
+
+r_emig_mod %>%
+  broom::tidy() %>%
+  mutate(
+    p.value = scales::pvalue(p.value),
+  ) %>%
+  kable(
+  caption = 'Ricker alpha and beta parameter estimates for emigrants at the Lostine River screw trap recruiting from spawning natural and hatchery origin spawners.',
+  col.names = c("Parameter", "Estimate", "SE", "t-statistic", "p-value"),
+  digits = c(0, 5, 5, 2, 3)
+  ) %>%
+  kable_styling(bootstrap_options = 'striped')
+```
+
+```{r plot-emigration, fig.cap='Stock-recruit curves for Lostine River emigrants at the rotary screw trap recruiting from natural and hatchery origin spawners.'}
+k_bh = coef(bh_emig_mod)[1]/coef(bh_emig_mod)[2]
+max_stock <- 1/coef(r_emig_mod)[2]
+k_r <- predict_Ricker(stock = max_stock, alpha = coef(r_emig_mod)[1], beta = coef(r_emig_mod)[2])
+
+x_max <- 6000 #max(dat$nat_spawners+dat$hat_spawners)
+
+
+plot(dat$nat_spawners + dat$hat_spawners, dat$nat_emig, pch = 19, cex = 1,
+     main = 'Lostine River Emigrant Stock-Recruit Curves',
+     ylab = 'Emigrants',
+     xlab = 'Spawners',
+     xlim = c(0, x_max),
+     ylim = c(0, k_bh))
+lines(0:x_max,
+      predict_BH(stock = 0:x_max, alpha = coef(bh_emig_mod)[1], beta = coef(bh_emig_mod)[2]),
+      col = 'blue')
+lines(0:x_max,
+      predict_Ricker(stock = 0:x_max, alpha = coef(r_emig_mod)[1], beta = coef(r_emig_mod)[2]),
+      col = 'green')
+abline(h = k_bh, lty = 2, col = 'blue')
+abline(h = k_r, lty = 2, col = 'green')
+segments(x0 = max_stock, y0 = 0, x1 = max_stock, y1 = k_r, lty = 3, col = 'green')
+legend('bottomright', legend = c('Beverton-Holt', 'Ricker'), col = c('blue', 'green'), lty = c(2,2))
+```
+
+### Smolt Productivity
+
+The productivity of smolt reaching Lower Grante Dam was estimated......
+
+```{r fit-smolt-BH}
+# fit smolt models ----
+
+bh_smolt_mod <- fit_BH(stock = dat$nat_spawners + dat$hat_spawners, recruits = dat$nat_smolts, inits = list(150, .0002))
+
+bh_emig_mod %>%
+  broom::tidy() %>%
+  mutate(
+    p.value = scales::pvalue(p.value),
+  ) %>%
+  kable(
+  caption = 'Beverton-Holt alpha and beta parameter estimates for smolts at Lower Granite Dam recruiting from spawning natural and hatchery origin spawners.',
+  col.names = c("Parameter", "Estimate", "SE", "t-statistic", "p-value"),
+  digits = c(0, 5, 5, 2, 3)
+  ) %>%
+  kable_styling(bootstrap_options = 'striped')
+```
+
+```{r fit-smolt-Ricker}
+r_smolt_mod <- fit_Ricker(stock = dat$nat_spawners + dat$hat_spawners, recruits = dat$nat_smolts, inits = list(150, .00007))
+
+r_emig_mod %>%
+  broom::tidy() %>%
+  mutate(
+    p.value = scales::pvalue(p.value),
+  ) %>%
+  kable(
+  caption = 'Ricker alpha and beta parameter estimates for smolts at Lower Granite Dam recruiting from spawning natural and hatchery origin spawners.',
+  col.names = c("Parameter", "Estimate", "SE", "t-statistic", "p-value"),
+  digits = c(0, 5, 5, 2, 3)
+  ) %>%
+  kable_styling(bootstrap_options = 'striped')
+```
+
+```{r plot-smolt, fig.cap='Stock-recruit curves for Lostine River smolt at Lower Granite Dam recruiting from natural and hatchery origin spawners.'}
+#bquote(paste('Beverton-Holt: ', alpha == .(a), ", ", beta == .(b), ", ", capacity == .(k))
+
+k_bh = coef(bh_smolt_mod)[1]/coef(bh_smolt_mod)[2]
+max_stock <- 1/coef(r_smolt_mod)[2]
+k_r <- predict_Ricker(stock = max_stock, alpha = coef(r_smolt_mod)[1], beta = coef(r_smolt_mod)[2])
+
+x_max <- 6000 #max(dat$nat_spawners+dat$hat_spawners)
+
+plot(dat$nat_spawners + dat$hat_spawners, dat$nat_smolts, pch = 19, cex = 1,
+     main = 'Lostine River Smolt Stock-Recruit Curves',
+     ylab = 'Smolts',
+     xlab = 'Spawners',
+     #xlim = c(0, x_max),
+     ylim = c(0, k_bh))
+lines(0:x_max,
+      predict_BH(stock = 0:x_max, alpha = coef(bh_smolt_mod)[1], beta = coef(bh_smolt_mod)[2]),
+      col = 'blue')
+lines(0:x_max,
+      predict_Ricker(stock = 0:x_max, alpha = coef(r_smolt_mod)[1], beta = coef(r_smolt_mod)[2]),
+      col = 'green')
+abline(h = k_bh, lty = 2, col = 'blue')
+abline(h = k_r, lty = 2, col = 'green')
+segments(x0 = max_stock, y0 = 0, x1 = max_stock, y1 = k_r, lty = 3, col = 'green')
+legend('bottomright', legend = c('Beverton-Holt', 'Ricker'), col = c('blue', 'green'), lty = c(2,2))
+```
+
+
+```{r save-SR-params}
+saveRDS(bh_smolt_mod, file = here::here('data', 'lostine_mods', 'lostine_smolt_mod.rds'))
+```
+
+### Smolt-to-Adult Return Rates
+
+We modeled smolt-to-adult return (SAR) rates and their covariance between natural and hatchery origin fish with a linear mixed effects model [@zuurMixedEffectsModels2009]. Similar to @boschEffectsVolitionalEmigration2023, a logit link was used to estimate the SAR proportions as a linear function of the fixed effect origin and the random effect of brood_year.
+
+```{r fit-sar-model}
+sar_dat <- dat %>%
+  mutate(nat_sar = nat_by_return/nat_smolts,
+         hat_sar = hat_by_return/hat_smolts) %>%
+  select(brood_year, nat_smolts, hat_smolts, nat_by_return, hat_by_return) %>%
+  pivot_longer(-brood_year) %>%
+  separate(name, into = c('origin', 'metric'), sep = '_') %>%
+  pivot_wider(names_from = 'metric', values_from = 'value') %>%
+  mutate(failure = smolts - by,
+         sar = by/smolts,
+         brood_year = factor(brood_year),
+         origin = factor(origin, levels = c('nat', 'hat')))
+
+response <- cbind(sar_dat$by, sar_dat$failure)
+
+sar_mod <- lme4::glmer(response ~ origin + (1|brood_year), data = sar_dat,
+               family = binomial(link = 'logit'))
+
+# sar_null <- lme4::glmer(response ~ 1 + (1|brood_year), data = sar_dat,
+#                family = binomial(link = 'logit')) 
+
+#anova(sar_mod, sar_null, test = 'Chi')
+```
+
+```{r save-SAR-params}
+saveRDS(sar_mod, file = here::here('data', 'lostine_mods', 'lostine_sar_mod.rds'))
+```
+
+
+\@ref(fig:plot-sar-mod) indicates natural origin SARs are typically higher than hatchery origin and range from `r range(sar_dat$sar[sar_dat$origin=='nat'], na.rm = TRUE)`. Hatchery origin SARs range from `r range(sar_dat$sar[sar_dat$origin=='hat'], na.rm = TRUE)` and on average are only `r round(exp(fixef(sar_mod)[2])*100)`% of the natural origin SAR.
+
+
+```{r plot-sar-mod, fig.cap = 'Brood year estimates of smolt to adult return (SAR) rates for Lostine River natural and hatchery origin returns. The mean SAR for each origin is shown in black with the associated 95% confidence intervals. '}
+
+preds <- ggpredict(sar_mod, type = 'fixed', terms = 'origin') %>%
+  as_tibble() %>%
+  rename('origin' = x)
+
+# ggpredict(sar_mod, type = 're', terms = c('origin', 'brood_year'))
+
+ggplot(data = sar_dat, aes(x = origin, y = sar)) +
+  geom_line(aes(group = brood_year), colour = 'lightgrey') +
+  geom_point(aes(colour = origin), position = position_dodge(width = 0.75)) +
+  geom_pointrange(data = preds, aes(x = origin, y = predicted, ymin = conf.low, ymax = conf.high)) +
+  scale_color_brewer(palette = 'Dark2') +
+  theme_bw() +
+  theme(legend.position = 'none')
+```
+
+SAR predictions generated from the fitted SAR model are shown in \@ref(fig:plot-sar-preds). Predictions are derived using the uncertainty and covariance in fixed effects parameters and the random brood year effects. 
+
+```{r plot-sar-preds, fig.cap = 'Smolt-to-adult return predictions based on the best fitting model and random brood year effects.'}
+iloop <- 1000
+nat <- vector("numeric", iloop)
+hat <- vector("numeric", iloop)
+for(i in 1:iloop){
+beta <- fixef(sar_mod) + MASS::mvrnorm(1, mu = numeric(length(fixef(sar_mod))), Sigma = vcov(sar_mod))
+
+yr_ef <- c(rnorm(1, 0, VarCorr(sar_mod)$brood_year[1,1]),0)
+
+x <- matrix(c(1,1,0,1), nrow = 2, dimnames = list(c('nat', 'hat')))
+tmp <- plogis(x %*% (beta + yr_ef))
+nat[i] <- tmp[1,1]
+hat[i] <- tmp[2,1]
+}
+
+tibble('origin'= rep(c('nat', 'hat'), each = iloop),
+                    'sar' = c(nat, hat)) %>%
+  ggplot() +
+  geom_density(aes(x = sar, fill = origin), alpha = .5) +
+  scale_fill_brewer(palette = 'Dark2') +
+  theme_minimal()
+
+```
+
+### Age at Return
+
+```{r age-dat}
+age_dat <- dat %>%
+  select(brood_year, matches("[0-9]+"), matches("[0-9]+")) %>%
+  pivot_longer(cols = -brood_year, names_to = 'key', values_to = 'value') %>%
+  separate(key, into = c('origin', 'age')) %>%
+  filter(value != 0,
+         !is.na(value)) %>%
+  filter(age != '6',
+         age != '2') %>%
+  group_by(brood_year, origin) %>%
+  mutate(total = sum(value),
+         failure = total - value,
+         p = value/total) %>%
+  mutate(brood_year = as.numeric(brood_year),
+         age = factor(age, levels = c(3,4,5)),
+         origin = factor(origin, levels = c('nat', 'hat')))
+
+age_long <- age_dat %>%
+  select(-(total:p)) %>%
+  slice(rep(row_number(), value)) %>%
+  select(-value) %>%
+  mutate(age = as.factor(age))
+```
+
+```{r fit-age-mod}
+# use multinomial regression
+# age_mod <- multinom(age ~ origin + brood_year + origin:brood_year, data = age_long,
+#                     Hess = TRUE,
+#                     trace = FALSE)
+
+# age_no_int <- multinom(age ~ origin + brood_year, data = age_long,
+#                       Hess = TRUE,
+#                       trace = FALSE)
+
+#anova(age_no_int, age_mod) # interaction is sign.
+
+age_mod <- multinom(age ~ origin, data = age_long,
+                       Hess = TRUE,
+                       trace = FALSE)
+
+#anova(age_no_by, age_no_int) # brood year is important, but equal for both
+```
+Age-at-return was modeled with three age categories (i.e., 3, 4, and 5) using multinomial logistic models [@agrestiCategoricalDataAnalysis2003] with terms for origin, brood year, and the origin by brood year interaction. We determined the full model was the best fit when compared against model subsets with an analysis of deviance. The model indicated natural origin age 3 returns were relatively  decreasing while older age 4 and 5 fish are increasing (\@ref(fig:plot-age-mod). Hatchery origin fish showed steep decreases in age 3 and age 5 returns with a steep increase in age 4 returns. 
+
+```{r sum-age-mod, tab.cap = 'Log-odds for the fitted age model.'}
+broom::tidy(age_mod)
+```
+
+
+```{r plot-age-mod, fig.cap = 'Estimated mean age proportions for Lostine River natural and hatchery origin returning fish.'}
+
+preds <- ggeffect(age_mod, terms = c('origin')) %>% #, 'brood_year[1998:2023, by = 1]')) %>%
+  as_tibble() %>%
+  rename(origin = x) %>%#, brood_year = group) %>%
+  mutate(age = str_remove(response.level, 'X'),
+         grp = paste(origin,age), 
+         p = predicted)
+
+# tmp <- age_long %>%
+#   group_by(origin, age, brood_year) %>%
+#   summarise(n = n()) %>%
+#   group_by(origin, brood_year) %>%
+#   mutate(tot = sum(n),
+#          p = n/tot)
+#   
+#   
+# ggplot() +
+#   geom_violin(data = tmp, aes(x = origin, y = p, colour = age)) +
+#   geom_pointrange(data = preds, aes(x = origin, y = p, ymin = conf.low, ymax = conf.high, colour = age, group = grp), position = position_dodge2(width = 1))
+
+ggplot(preds, aes(x = origin, y = predicted, ymin = conf.low, ymax = conf.high, colour = age, group = grp)) +
+  geom_pointrange(aes(ymin = conf.low, ymax = conf.high), position = position_dodge(width = .25)) +
+  scale_color_brewer(palette = 'Dark2') +
+  labs(#title = 'Johnson Creek',
+       #subtitle = 'Modeled Age Proportions',
+       x = 'Brood Year',
+       y = 'Proportion') +
+  #ylim(c(0, 1)) +
+  facet_wrap(~age, scales = 'free_y') +
+  theme_bw()
+
+# ggplot(preds, aes(x = brood_year, y = predicted, group = grp)) +
+#   geom_line(aes(color = age, linetype = origin), size = 1) +
+#   geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = .25) +
+#   geom_point(data = age_dat, aes(x = brood_year, y = p, colour = age, shape = origin, group = paste(age_dat$origin, age_dat$age))) +
+#   scale_color_brewer(palette = 'Dark2') +
+#   labs(#title = 'Johnson Creek',
+#        #subtitle = 'Modeled Age Proportions',
+#        x = 'Brood Year',
+#        y = 'Proportion') +
+#   ylim(c(0, 1)) +
+#   facet_wrap(~age) +
+#   theme_minimal()
+```
+```{r age-dist, fig.cap = 'Age-at-return predictions based on the multinomial logistic regression model for natural and hatchery origin returns.'}
+iloop <- 1000
+nat <- matrix(NA, nrow = iloop, ncol = 3)
+hat <- matrix(NA, nrow = iloop, ncol = 3)
+
+mu <- as.vector(t(coef(age_mod)))
+sigma <- vcov(age_mod)
+
+for(i in 1:iloop){
+beta <- matrix(MASS::mvrnorm(1, mu = mu, Sigma = sigma), ncol = 2, byrow = TRUE)
+nat_tmp <- exp(beta[,1])/(1+sum(exp(beta[,1])))
+nat_tmp <- c(1-sum(nat_tmp), nat_tmp)
+nat_esc <- rmultinom(1,500,nat_tmp)
+nat_age <- nat_esc/sum(nat_esc)
+
+hat_tmp <- exp(apply(beta,1,sum)) / (1 + sum(exp(apply(beta,1,sum))))
+hat_tmp <- c(1 - sum(hat_tmp), hat_tmp)
+hat_esc <- rmultinom(1,500, hat_tmp)
+hat_age <- hat_esc/sum(hat_esc)
+
+nat[i,] <- nat_age
+hat[i,] <- hat_age
+}
+
+age_preds <- as_tibble(nat) %>%
+  mutate(origin = 'nat') %>%
+  bind_rows(as_tibble(hat) %>%
+              mutate(origin = 'hat')) %>%
+  pivot_longer(cols = contains('V'), names_to = 'ocean_age', values_to = 'p') %>%
+  mutate(age = case_when(
+    ocean_age == 'V1' ~ '3',
+    ocean_age == 'V2' ~ '4',
+    ocean_age == 'V3' ~ '5'
+  ))
+
+ggplot() +
+  geom_boxplot(data = age_preds, aes(x = origin, y = p, fill = age)) +
+ # geom_point(data = age_dat, aes(x = origin, y = p, group = age), position = position_dodge(width = 1)) +
+  scale_fill_brewer(palette = 'Dark2') +
+  facet_wrap(~origin, scales = 'free') +
+  theme_bw()
+```
+
+```{r save-age-mod}
+saveRDS(age_mod, file = here::here('data', 'lostine_mods', 'lostine_age_mod.rds'))
+```
+
+```{r bs-smolt, fig.cap = 'Ratio of hatchery smolt surviving to Lower Granite Dam from spawned hatchery broodstock.'}
+dat %>%
+  filter(brood_year >= 2004) %>%
+  mutate(bs_smolt = hat_smolts/hat_bs_spawners) %>%
+  ggplot(aes(x = bs_smolt)) +
+  geom_histogram() +
+  labs(x = 'Hatchery smolt / Broodstock',
+       y = 'Count') +
+  theme_bw()
+```
+```{r bs-smolt-params}
+bs_ratio <- dat %>%
+  filter(brood_year >= 2004) %>%
+  mutate(bs_smolt = hat_smolts/hat_bs_spawners) %>%
+  summarise(mu = mean(log(bs_smolt)),
+            sd = sd(log(bs_smolt))) %>%
+  as.matrix()
+```
+
+```{r bs-smolt-sample, fig.cap = 'Sampled brood stock to smolt ratios.' }
+tibble('bs_ratio' = rlnorm(1000, bs_ratio[,1], bs_ratio[,2])) %>%
+  ggplot(aes(x = bs_ratio), fill = NA) +
+  geom_histogram() +
+  labs(x = 'Hatchery smolt / Broodstock',
+       y = 'Count') +
+  theme_bw()
+```
+
+
+# References
+
+<div id="refs"></div>
+
+# Appendix

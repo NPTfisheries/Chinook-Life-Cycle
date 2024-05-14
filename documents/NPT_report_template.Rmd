@@ -1,0 +1,39 @@
+---
+output: 
+  pdf_document:
+    citation_package: natbib
+    keep_tex: true
+    fig_caption: true
+    #latex_engine: xelatex
+    template: C://GitHub_Repos/Save-the-Salmon-Models/templates/NPT_report_template.tex   
+# bibliography: master.bib
+# header-includes:
+#   -  \usepackage{hyperref}
+# biblio-style: apsr
+title: "Fall Chinook Salmon 2020 UAV Redd Count Estimate"
+#subtitle: "Testing text."
+shorttitle: "UAV Estimates"
+author:
+- name: Ryan N. Kinzer
+  affiliation: Research Division, Department of Fisheries Resources Management
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+geometry: margin=1in
+fontfamily: mathpazo
+fontsize: 10pt
+branding: yes
+# abstract: "Testing text."
+#keywords: "pandoc, r markdown, knitr"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, error = FALSE,
+                      warning = FALSE)
+library(knitr)
+library(kableExtra)
+```
+
+# References
+
+<div id="refs"></div>
+
+# Appendix
