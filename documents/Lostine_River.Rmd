@@ -30,7 +30,7 @@ output:
 institute:
 - npt_mccall: Nez Perce Tribe, Department of Fisheries Resources Management, 14054 Burr Dr., McCall, Idaho, 83638, USA
 csl: "../templates/journal-of-archaeological-science.csl"
-#bibliography: hatchery_model.bib
+bibliography: hatchery_model.bib
 always_allow_html: yes
 ---
 
@@ -283,20 +283,30 @@ mod_results %>%
 
 The life-cycle model for the Lostine River incorporates 5 life stages and utilizes a Monte-Carlo simulation to randomly sample possible outcomes from probability distributions for each life-stage. The individual life stages include:
 
-1. Tributary escapement to weir escapement influenced by available harvest rates.
 1. Weir escapement to broodstock and released upstream dictated by weir management sliding scales.
 1. Broodstock and released upstream to successful hatchery and natural spawners influenced by pre-spawn mortality rates.
 1. Spawners to smolt surviving to Lower Granite Dam and governed by observed stock-recruit functions.
 1. Smolts to tributary escapement governed by observed SARs.
+1. Tributary escapement to weir escapement influenced by available harvest rates.
 
 Assumed probability distributions were parameterized with Lostine River juvenile, adult, and survival data collected during the last 23 years (1995-2018). Parameter estimates used in the life-cycle model are shown in the following section.
 
 ## Parameter Estimates
 
-### Emigrant Productivity
-Juvenile emigrant productivity was estimated from the abundance of parr leaving the Lostine River and the estimated number of spawners.
+### Weir Management Sliding Scale
 
-```{r fit-emigration-BH, tab.cap='Beverton-Holt alpha and beta parameter estimates for emigrants at the Lostine River screw trap recruiting from spawning natural and hatchery origin spawners.'}
+Insert table of sliding scale.
+
+### Successful Spawners
+
+Insert prespawn mortality estimates.  Currently set at 0.
+
+```{r fit-emigration-BH, eval = FALSE, tab.cap='Beverton-Holt alpha and beta parameter estimates for emigrants at the Lostine River screw trap recruiting from spawning natural and hatchery origin spawners.'}
+
+### Emigrant Productivity
+# Juvenile emigrant productivity was estimated from the abundance of parr leaving the Lostine River and the estimated number of spawners.
+
+
 # fit emigration models ----
 bh_emig_mod <- fit_BH(stock = dat$nat_spawners + dat$hat_spawners, recruits = dat$nat_emig, inits = list(350, .0005))
 
@@ -312,7 +322,7 @@ bh_emig_mod %>%
   kable_styling(bootstrap_options = 'striped')
 ```
 
-```{r fit-emigration-Ricker}
+```{r fit-emigration-Ricker, eval = FALSE}
 r_emig_mod <- fit_Ricker(stock = dat$nat_spawners + dat$hat_spawners, recruits = dat$nat_emig, inits = list(300, .0018))
 
 r_emig_mod %>%
@@ -328,7 +338,7 @@ r_emig_mod %>%
   kable_styling(bootstrap_options = 'striped')
 ```
 
-```{r plot-emigration, fig.cap='Stock-recruit curves for Lostine River emigrants at the rotary screw trap recruiting from natural and hatchery origin spawners.'}
+```{r plot-emigration, eval = FALSE, fig.cap='Stock-recruit curves for Lostine River emigrants at the rotary screw trap recruiting from natural and hatchery origin spawners.'}
 k_bh = coef(bh_emig_mod)[1]/coef(bh_emig_mod)[2]
 max_stock <- 1/coef(r_emig_mod)[2]
 k_r <- predict_Ricker(stock = max_stock, alpha = coef(r_emig_mod)[1], beta = coef(r_emig_mod)[2])
@@ -363,7 +373,7 @@ The productivity of smolt reaching Lower Grante Dam was estimated......
 
 bh_smolt_mod <- fit_BH(stock = dat$nat_spawners + dat$hat_spawners, recruits = dat$nat_smolts, inits = list(150, .0002))
 
-bh_emig_mod %>%
+bh_smolt_mod %>%
   broom::tidy() %>%
   mutate(
     p.value = scales::pvalue(p.value),
@@ -379,7 +389,7 @@ bh_emig_mod %>%
 ```{r fit-smolt-Ricker}
 r_smolt_mod <- fit_Ricker(stock = dat$nat_spawners + dat$hat_spawners, recruits = dat$nat_smolts, inits = list(150, .00007))
 
-r_emig_mod %>%
+r_smolt_mod %>%
   broom::tidy() %>%
   mutate(
     p.value = scales::pvalue(p.value),
@@ -599,6 +609,7 @@ ggplot(preds, aes(x = origin, y = predicted, ymin = conf.low, ymax = conf.high, 
 #   facet_wrap(~age) +
 #   theme_minimal()
 ```
+
 ```{r age-dist, fig.cap = 'Age-at-return predictions based on the multinomial logistic regression model for natural and hatchery origin returns.'}
 iloop <- 1000
 nat <- matrix(NA, nrow = iloop, ncol = 3)
@@ -673,6 +684,10 @@ tibble('bs_ratio' = rlnorm(1000, bs_ratio[,1], bs_ratio[,2])) %>%
        y = 'Count') +
   theme_bw()
 ```
+
+### Harvest Sliding Scale
+
+Insert table of harvest sliding scale.
 
 
 # References
