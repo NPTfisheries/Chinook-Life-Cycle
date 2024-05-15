@@ -41,6 +41,7 @@ life_cycle <- function(
   
   source(here::here("R","predict_BH.R"))
   source(here::here("R","predict_Ricker.R"))
+  source(here::here("R", "weir_scale.R"))
   source(here::here('R','calc_harvest.R'))
   
   # need positive integers, if fractional numbers are supplied integer will drop fractional portion
@@ -80,26 +81,29 @@ life_cycle <- function(
   # create sliding scales
   
   # weir management
-  critical <- viable * .3
   
-  steps <- ceiling(c(
-    .05 * critical,
-    .5 * critical,
-    critical,
-    .5 * viable,
-    viable,
-    1.5 * viable,
-    2 * viable,
-    Inf
-  ))
+  weir_table <- weir_scale(viable)
   
-  weir_scale <- as.data.frame(cbind(
-    'steps' = steps,
-    'max_pNOB' = c(0, .5, .4, .4, .3, .3, .25, .25),
-    'min_pNOB' = c(0, 0, .2, .25, .3, .4, .5, 1.0),
-    #greater than 2 * viable = .25
-    'max_pHOS' = c(1.0, 1.0, .7, .6, .5, .4, .25, .1) # greater than 2 * viable = .1
-  ))
+  # critical <- viable * .3
+  # 
+  # steps <- ceiling(c(
+  #   .05 * critical,
+  #   .5 * critical,
+  #   critical,
+  #   .5 * viable,
+  #   viable,
+  #   1.5 * viable,
+  #   2 * viable,
+  #   Inf
+  # ))
+  # 
+  # weir_scale <- as.data.frame(cbind(
+  #   'steps' = steps,
+  #   'max_pNOB' = c(0, .5, .4, .4, .3, .3, .25, .25),
+  #   'min_pNOB' = c(0, 0, .2, .25, .3, .4, .5, 1.0),
+  #   #greater than 2 * viable = .25
+  #   'max_pHOS' = c(1.0, 1.0, .7, .6, .5, .4, .25, .1) # greater than 2 * viable = .1
+  # ))
   
   # harvest scale - now use a function that is specific to Lostine
   # pMAT_upper <- c(.3, .5, .75, 1.08)
@@ -108,7 +112,7 @@ life_cycle <- function(
   
   # create object to store RY returns
   
-  col_names <- c('nat_esc', 'adult_nat_esc', 'hat_esc', 'adult_hat_esc', 'nat_by_rtn', 'hat_by_rtn', 'nob', 'hob', 'nob_spwn', 'hob_spwn', 'nos', 'hos', 'nat_smolt', 'hat_smolt', 'nat_harvest', 'hat_harvest')
+  col_names <- c('nat_esc', 'adult_nat_esc', 'hat_esc', 'adult_hat_esc', 'adult_hat_removed', 'nat_by_rtn', 'hat_by_rtn', 'nob', 'hob', 'nob_spwn', 'hob_spwn', 'nos', 'hos', 'nat_smolt', 'hat_smolt', 'nat_harvest', 'hat_harvest')
   
   dat <- matrix(
     nrow = years,
@@ -139,59 +143,56 @@ life_cycle <- function(
     #   browser()
     # }
     
+    # tributary escapement with jacks
     nat_esc <- sum(nat_esc_age[i,])
     hat_esc <- sum(hat_esc_age[i,])
     
-    # pre harvest
+    # pre harvest adult only tributary escapement 
     pre_adult_nat_esc <- sum(nat_esc_age[i,reproduction_age:length(Nage)])
     pre_adult_hat_esc <- sum(hat_esc_age[i,reproduction_age:length(Hage)])
-    
-    harvest_ests <- calc_harvest(pre_adult_nat_esc, pre_adult_hat_esc, bs)
-    nat_harvest <- harvest_ests[[1]]
-    hat_harvest <- harvest_ests[[2]]
-    
-    if(harvest){
-      harvest_ests <- calc_harvest(pre_adult_nat_esc, pre_adult_hat_esc, bs)
-      nat_harvest <- harvest_ests[[1]]
-      hat_harvest <- harvest_ests[[2]]
-      
-      adult_nat_esc <- pre_adult_nat_esc - nat_harvest
-      adult_hat_esc <- pre_adult_hat_esc - hat_harvest
-    } else {
-      nat_harvest <- 0
-      hat_harvest <- 0
-      
-      adult_nat_esc <- pre_adult_nat_esc
-      adult_hat_esc <- pre_adult_hat_esc
-    }
-    
-    # adults spawning in the hatchery
+
+    # weir management proportions - based on preharvest adult only estimates
 
     if(sliding_scale){
-      max_phos <- weir_scale[min(which(weir_scale$steps > nat_esc)),4]                  
+      max_phos <- weir_table[min(which(weir_table$steps > pre_adult_nat_esc)),4]                  
     } else {
       if(max_pHOS == 1){
-        max_phos <- max_pHOS - .01
+        max_phos <- max_pHOS - .001
       } else {
         max_phos <- max_pHOS
       }
     }
     
     if(pNOB == 'min'){
-      pnob = weir_scale[min(which(weir_scale$steps > nat_esc)),3]
+      pnob = weir_table[min(which(weir_table$steps > pre_adult_nat_esc)),3]
     } else if(pNOB == 'max'){
-      pnob <- weir_scale[min(which(weir_scale$steps > nat_esc)),2]
+      pnob <- weir_table[min(which(weir_table$steps > pre_adult_nat_esc)),2]
     }
     
     tmp_nob <- floor(bs * pnob)
 
+    # harvest limits
+    if(harvest){
+      harvest_ests <- calc_harvest(pre_adult_nat_esc, pre_adult_hat_esc, bs)
+      nat_harvest <- harvest_ests[[1]]
+      hat_harvest <- harvest_ests[[2]]
+    } else {
+      nat_harvest <- 0
+      hat_harvest <- 0
+    }
+    
+    # adults reaching the weir post harvest - assumes 100% exploitation
+    adult_nat_esc <- pre_adult_nat_esc - nat_harvest
+    adult_hat_esc <- pre_adult_hat_esc - hat_harvest
+    
+    
     if(tmp_nob <= adult_nat_esc){
       nob <- tmp_nob
     } else {
       nob <- adult_nat_esc
     }
     
-    nob_spwn <- rbinom(1, nob, 1-Hpsp)  # actual natural-origin brood surviving to spawn
+    nob_spwn <- rbinom(1, nob, 1-Hpsp)  # actual natural-origin brood surviving to spawn in the hatchery
     
     tmp_hob = bs - nob       # if nob = 0, 100% of brood stock take is hatchery origin
     
@@ -201,7 +202,7 @@ life_cycle <- function(
       hob <- adult_hat_esc
     }
     
-    hob_spwn <- rbinom(1, hob, 1-Hpsp) # actual hatchery-origin brood surviving to spawn
+    hob_spwn <- rbinom(1, hob, 1-Hpsp) # actual hatchery-origin brood surviving to spawn in the hatchery
     
     BS <- nob_spwn + hob_spwn
     
@@ -215,7 +216,7 @@ life_cycle <- function(
     }
     
     # what actually spawned
-    nos <- rbinom(1, tmp_nos, 1-Npsp)
+    nos <- rbinom(1, tmp_nos, 1-Npsp) # actual spawning adults in the wild
     
     tmp_hos <-adult_hat_esc - hob
     
@@ -235,22 +236,10 @@ life_cycle <- function(
     if (tmp_hos <= 0) {
       tmp_hos <- 0
     }
+    
+    adult_hat_removed <- adult_hat_esc - hob - tmp_hos
         
     hos <- rbinom(1, tmp_hos, (1-Npsp))
-    
-    adult_hat_rm <- adult_hat_esc - hob - tmp_hos
-    
-    # #Harvest - adult only and comes out after brood stock is collected
-    # if (harvest) {
-    #   if ((sum(nat_esc_age[i,reproduction_age:length(Nage)]) + sum(hat_esc_age[i,reproduction_age:length(Sage)])) <= harvest_thres[1]) {
-    #     h <- 0
-    #   } else {
-    #     id <- max(which(harvest_thres < (sum(nat_esc_age[i,reproduction_age:length(Nage)]) + sum(hat_esc_age[i,reproduction_age:length(Sage)]))))
-    #     harvest <- floor((harvest_thres[id] * NPT_harvest[id]) + ((sum(nat_esc_age[i,reproduction_age:length(Nage)]) + sum(hat_esc_age[i,reproduction_age:length(Sage)])) - harvest_thres[id]) * NPT_harvest[id + 1]) # harvest large portion of fish at lower rate, harvest excess at higher rate
-    #   }
-    # } else {
-    #   h <- 0
-    # }
     
     spawners <- (nos + hos)      # Total fish spawning in the stream
     
@@ -276,7 +265,7 @@ life_cycle <- function(
     nat_smolt <- floor(nat_smolt)
     hat_smolt <- floor(BS * BSsmolt)
     
-    # smolts to escapement at weir
+    # smolts to total tributary escapement including jacks
     if(!stochastic){
       beta <- lme4::fixef(sar_model)
       yr_ef <- c(0,0)
@@ -323,7 +312,7 @@ life_cycle <- function(
       hat_esc_age[i+j,j] <- hat_by_rtn_age[j,1]
     }
     
-    dat_by <- c(nat_esc, adult_nat_esc, hat_esc, adult_hat_esc, nat_by_rtn, hat_by_rtn, nob, hob, nob_spwn, hob_spwn, nos, hos, nat_smolt, hat_smolt, nat_harvest, hat_harvest)
+    dat_by <- c(nat_esc, adult_nat_esc, hat_esc, adult_hat_esc, adult_hat_removed, nat_by_rtn, hat_by_rtn, nob, hob, nob_spwn, hob_spwn, nos, hos, nat_smolt, hat_smolt, nat_harvest, hat_harvest)
     dat[i,] <- dat_by
     
   }
