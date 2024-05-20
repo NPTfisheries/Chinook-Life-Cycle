@@ -30,7 +30,7 @@ output:
     - "--lua-filter=../templates/pagebreak.lua"
 institute:
 - npt_mccall: Nez Perce Tribe, Department of Fisheries Resources Management, 14054 Burr Dr., McCall, Idaho, 83638, USA
-csl: "../templates/journal-of-archaeological-science.csl"
+csl: "../templates/american-fisheries-society.csl"
 bibliography: hatchery_model.bib
 always_allow_html: yes
 ---
@@ -361,21 +361,17 @@ What impact or advantage to we see from removing NOR parr and rearing in hatcher
 
 # Methods
 
-## Life-cycle Simulation Model
+## Life-cycle Model
 
-The fitted life-cycle model incorporates 5 life stages and incorporates stochasticity using a Monte-Carlo simulation approach. The simulation randomly samples variables from known probability distributions to gain inference about an unknown outcome [@gentleMonteCarloSimulation2015].  After the random variables are drawn we use them in deterministic functions to make probabilistic inferences at the life stages of interest [@manlyRandomizationBootstrapMonte2017].  Our model simulates salmon abundance stochasticity by sampling juvenile productivity from assumed stock-recruit relationships, smolt-to-adult return rate models, and age composition values from multinomial distributions and observed data.  Mean and variance parameters for each modeled distribution are estimated from observed data in order to mimic true Lostine River returns.
+The developed model incorporates 5 life stages and stochasticity using a Monte-Carlo simulation approach. The simulation randomly samples variables from known probability distributions to gain inference about an unknown outcome [@gentleMonteCarloSimulation2015]. After the random variables are drawn we use them in deterministic functions to make probabilistic inferences at the life stages of interest [@manlyRandomizationBootstrapMonte2017]. Model design follows a stream type Chinook salmon life cycle in Idaho [@grootPacificSalmonLife1991] and simulates variable abundance by sampling productivity metrics from previously fitted models of natural and hatchery origin stock-recruit relationships, smolt-to-adult return rate, and age compositions using observed data from the Lostine River.
 
-The life-cycle model includes the following deterministic and stochastic life stages:
+Model inputs cover five key areas: (1) supplementation program design and weir management, (2) spawner success and juvenile productivity, (3) smolt-to-adult return rates, (4) age composition of adult returns, and (5) tributary harvest exploitation rates. Model outputs include total tributary abundance by origin and age, brood stock collection and spawner composition, and harvest opportunities available for the simulated return.
 
-1. Natural and hatchery origin adults kept for broodstock or released upstream to spawn naturally are determined by a weir management sliding scale and the number of fish returning to the Lostine River.
-1. Successfully spawning adults in the hatchery and natural environment are reduced from those kept for broodstock or released upstream by pre-spawn mortality rates.
-1. The number of natural smolt surviving to Lower Granite Dam is determined by a density-dependent Beverton-Holt stock-recruit model, while hatchery smolt is determined by a density-independent relationship.
-1. Surviving smolts returning to the Lostine River prior to harvest or weir removal (i.e., tributary escapement) are determined by observed SARs.
-1. The age and year of the fishes return comes from a multinomial model.
-1. Those fish are then harvested at a rate determined by the harvest sliding scale.
-1. The remaining fish escape to the weir and start the process over.
+The model simulates natural and hatchery abundance across time by estimating progeny returns with either fixed or random prespawn mortality, juvenile productivity, SARs, and age at return values.  Setting these four parameters as fixed, informs the model to return expected values of abundance across time; removing stochasticity.  In contrast, Monte Carlo simulations can be used to introduce stochasticity in abundance by randomly sampling parameters from known probability distributions.
 
 The model begins by determining the maximum proportion of adult hatchery-origin spawners ($pHOS$) allowed upstream of the weir, and the proportion of natural-origin fish allowed within the hatchery brood stock ($pNOB$). The proportions are determined by the estimated number of natural-origin adults returning to the tributary ($N^{Trib}_{NOR}$) and the agreed upon weir management sliding scale (\@ref(tab:plot-sar-mod))**(NEED CITATION)**.
+
+Natural and hatchery origin adults kept for broodstock or released upstream to spawn naturally are determined by a weir management sliding scale and the number of fish returning to the Lostine River.
 
 ```{r weir-scale, tab.cap="Lostine River weir management sliding scale sets the allowed proportions of natural-origin brood stock (pNOB) and hatchery-origin spawners (pHOS) based on a viable abundance of 500 adults and the estimated return of natural-origin adults."}
 source(here::here("R", "weir_scale.R"))
@@ -390,79 +386,94 @@ weir_scale(viable = 500) %>%
 ```
 
 
-The number of adult fish harvested ($h_O$), where $O$, is either natural-origin ($NOR$) or hatchery-origin ($HOR$) is determined by $N^{Trib}_{NOR}$ and the agreed upon sport and tribal harvest exploitation rates **(NEED CITATION)**. 
+Within the model, we assummed the number of natural-origin ($NOR$) and hatchery-origin ($HOR$) adult fish harvested is determined by $N^{Trib}_{NOR}$ and the agreed upon sport and tribal tributary harvest exploitation rates **(NEED CITATION)**. Table \@ref(tab:harvest-table) shows the exploitation rates used in the model for fish in excess of the closest lower rate. For example, if the natural-origin return was 500 adults, then harvest would equal $(300 * .01) + (500 - 300) * .08 = 19$. 
 
-**INSERT TABLE OF HARVEST RATES**
+```{r harvest-table, tab.cap = 'Tributary harvest rate on surplus fish greater than the closest lower rate.'}
+tibble("Abundance" = c('<300', '<1000', '<1500', '<2000', '>2000'),
+                      "Harvest Rate on Hatchery Excess" = c(.02, .09, .18, .21, .40),
+                      "Harvest on Natural Excess" = c(.01, .08, .16, .19, .28)) %>%
+  kable() %>%
+  kable_styling(bootstrap_options = 'striped')
+```
 
-For each origin {$O$}, the number of actual adult fish surviving to the weir, $N^{Weir}$, and available for brood stock collection and release upstream becomes,
 
-$$
-N^{Weir}_O = N^{Trib}_O - h^{}_O.
-$$
-The number of natural-origin brood stock ($BS_{NOR}$) is then calculated using the designated $pNOB$ from the weir management sliding scale (\@ref(tab:plot-sar-mod)),
-
-$$
-BS_{NOR} = N^{Weir}_{NOR} * pNOB.
-$$
-and, hatchery-origin brood stock ($BS_{HOR}$) becomes the remainder of the total brood stock need ($BS$),
+The number of adult fish surviving to the weir ($N^{Weir}$) for each origin {$O$}, and available for brood stock collection and release upstream then becomes,
 
 $$
-BS_{HOR} = BS - BS_{NOR}.
+N^{Weir}_O = N^{Trib}_O - h^{}_O,
+$$
+where $h_O$ represents the number of adults harvested. The number of natural-origin brood stock ($BS_{NOR}$) is then calculated using the designated $pNOB$ from the weir management sliding scale (\@ref(tab:plot-sar-mod)) and the available fish at the weir.
+
+$$
+BS_{NOR} = N^{Weir}_{NOR} * pNOB
+$$
+Hatchery-origin brood stock ($BS_{HOR}$) becomes the remainder of the total brood stock need ($BS$).
+
+$$
+BS_{HOR} = BS - BS_{NOR}
 $$
 
-The total number of fish successfully contributing to hatchery production ($S^{Hatchery}$) is then a random variable from a binomial distribution with an assumed prespawn mortality rate in the hatchery environment ($p^{Hatchery}$) and $BS$.
-
-$$
-S^{Hatchery} \sim Binom(p^{Hatchery}, BS)
-$$
-
-Natural-origin adult fish released upstream of the weir to spawn naturally is
+All remaining natural-origin adult fish are released upstream ($N^{Released}_{NOR}$) of the weir and are available to spawn naturally,
 
 $$
 N^{Released}_{NOR} = N^{Weir}_{NOR} - BS_{NOR},
 $$
-while, hatchery-origin fish released upstream to spawn naturally is controlled by the weir management sliding scale and the set maximum proportion of hatchery-origin spawners ($pHOS_{max}$),
+while, hatchery-origin fish released upstream ($N^{Released}_{HOR}$) to spawn naturally is controlled by the weir management sliding scale and set to the maximum proportion of hatchery-origin spawners ($pHOS_{max}$).
 
 $$
 N^{Released}_{HOR} = \frac{(-pHOS_{max} * S_{NOR})}{pHOS_{max} - 1}.
 $$
-Excess hatchery-origin adults removed ($R_{HOR}$) from the system and not available for future production then becomes,
 
-$$
- R_{HOR} = N^{Weir}_{HOR} - BS_{HOR} - N^{Released}_{HOR}.
-$$
-The number of fish contributing to natural production ($S$) is a random variable from a binomial distribution with an assumed prespawn mortality rate in nature ($p^{Nature}$) and the total spawners released.
+Excess hatchery-origin adults that were not collected for brood stock or released upstream are considered removed from the system and not available to produce offspring.
 
-$$
-S^{Nature} \sim Binom(p^{Nature}, N^{Released}_{NOR} + N^{Released}_{HOR})
-$$
-Juvenile productivity in nature follows a Beverton-Holt density dependent function, where $S^{Nature}$ represents the stock and natural-origin juvenile recruits ($J_{NOR}$) are smolt surviving to Lower Granite Dam.
+Once fish are designated into the correct spawning environment, natural or hatchery, The total number of fish successfully contributing to juvenile production ($S_{O}$) is then a random variable from a binomial distribution with an assumed prespawn mortality rate ($p_O$) and the number of available spawners.
+
+Juvenile productivity in the natural environment is assumed to follow a Beverton-Holt density dependent function, where $S^{NOR}$ represents the stock and natural-origin juvenile recruits ($J_{NOR}$) are smolt surviving to Lower Granite Dam.
 
 $$
 J_{NOR} = \frac{\alpha S}{1 + \beta S}
 $$
-The parameter $\alpha$ represents the maximum recruitment rate at low spawning abundances and $\beta$ is the density-dependent parameter that governs the functions shape.
 
-The ratio of hatchery-origin smolt surviving to Lower Granite Dam from $S^{Hatchery}$ is sampled from a log-normal distribution as follows,
+The $\alpha$ parameter represents the maximum recruitment rate at low spawning abundances and $\beta$ is the density-dependent parameter that governs the functions shape and carrying capacity ($k = \frac{\alpha}{\beta}$). 
+
+We assume hatchery-origin smolt $J^{HOR}$ surviving to Lower Granite Dam is a linear function of the total brood stock spawned. Stochasticity is introduced by sampling the the ratio of hatchery smolts to hatchery spawners ($\phi$) from a log-normal distribution,
 
 $$
 \phi \sim LogNormal(\mu_\phi, \sigma_\phi)
 $$
 
-where, $\mu_\phi$ and $\sigma_\phi$ is estimated from observed data. Hatchery-origin juvenile smolts surviving to Lower Granite Dam then becomes $R_{HOR} = S^{Hatchery} * \phi$.
+where, $\mu_\phi$ and $\sigma_\phi$ is estimated from observed data. Hatchery-origin juvenile smolts surviving to Lower Granite Dam then becomes,
+
+$$
+J_{HOR} = S^{Hatchery} * \phi.
+$$
+
+** NEED FINISHED ***
+
+**SAR**
 
 Brood year returns of NOR and HOR fish .
 
-**NEED TO FINISH DRAFTING**
 
-
-
-Age-at-return for both NOR and HOR.
+**Age-at-return** for both NOR and HOR.
 
 Tributary escapement is then summing across the correct age-at-return values.
 
+Total progeny return ($P_{i,t}$), regardless of origin ($i$), were assumed to return following a multinomial distribution;
 
- The Monte-Carlo model was written in the statistical computing language R (R Core Team 2014) and available in an R package at [https://github.com/NPTfisheries/Chinook-Life-Cycle](https://github.com/NPTfisheries/Chinook-Life-Cycle).
+\begin{equation}
+	[P_{i,3,t},P_{i,4,t},P_{i,5,t}]^T \sim Multinomial(P_{i,t},\pi_i).
+\end{equation} 
+
+With $\pi_i$ being a mean vector of age proportions supplied by the user for origin $i$, and $P_{i,j,t}$ being the number of progeny that returned from year $t$ at age $j= 3, 4$ or $5$.
+
+
+
+
+
+
+
+The Monte-Carlo model was written in the statistical computing language R (R Core Team 2014) and available in an R package at [https://github.com/NPTfisheries/Chinook-Life-Cycle](https://github.com/NPTfisheries/Chinook-Life-Cycle).
 
 ## Parameter Estimates
 
@@ -610,6 +621,42 @@ legend('bottomright', legend = c('Beverton-Holt', 'Ricker'), col = c('blue', 'gr
 ```{r save-SR-params}
 saveRDS(bh_smolt_mod, file = here::here('data', 'lostine_mods', 'lostine_smolt_mod.rds'))
 ```
+
+
+```{r fit-hat-smolt, fig.cap = 'Observed ratios of hatchery smolt surviving to Lower Granite Dam and brood stock.'}
+
+dat <- dat %>%
+  mutate(hat_prod = hat_smolts/hat_bs_spawners)
+
+yr_filter <- 2006
+
+dat %>%
+  filter(brood_year >= yr_filter) %>%
+  ggplot(aes(x = hat_prod)) +
+  geom_histogram() +
+  labs(x = "Hatchery smolt/Brood stock",
+       y = "Frequency") +
+  theme_classic()
+
+```
+
+```{r hat-prod-sampled, fig.cap = 'Sampled ratios of hatchery smolt surviving to Lower Granite Dam and brood stock.'}
+
+mean_prod <- mean(log(dat$hat_prod[dat$brood_year>=yr_filter]))
+sd_prod <- sd(log(dat$hat_prod[dat$brood_year>=yr_filter]))
+
+tmp <- tibble("hat_prod" = rlnorm(1000, meanlog = mean_prod, sdlog = sd_prod))
+
+ggplot() +
+  geom_density(data = tmp, aes(x = hat_prod)) +
+  #geom_histogram(data = tmp, aes(x = hat_prod)) +
+  #geom_freqpoly(data = tmp, aes(x = hat_prod, y = ..count..)) +
+  #scale_y_continuous(transform = scales::trans_new(~./1000)) +
+  labs(x = "Hatchery smolt/Brood stock",
+       y = "Sampled Density") +
+  theme_classic()
+```
+
 
 ### Smolt-to-Adult Return Rates
 
