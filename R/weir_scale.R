@@ -25,5 +25,8 @@ weir_scale <- function(viable){
     #greater than 2 * viable = .25
     'max_pHOS' = c(1.0, 1.0, .7, .6, .5, .4, .25, .1) # greater than 2 * viable = .1
   ))
+  
+  return(weir_scale)
+  
 }
 

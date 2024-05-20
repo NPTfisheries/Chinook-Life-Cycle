@@ -105,11 +105,6 @@ life_cycle <- function(
   #   'max_pHOS' = c(1.0, 1.0, .7, .6, .5, .4, .25, .1) # greater than 2 * viable = .1
   # ))
   
-  # harvest scale - now use a function that is specific to Lostine
-  # pMAT_upper <- c(.3, .5, .75, 1.08)
-  # NPT_harvest <- c(.01, .02, .03, .044, .175)
-  # harvest_thres <- viable * pMAT_upper
-  
   # create object to store RY returns
   
   col_names <- c('nat_esc', 'adult_nat_esc', 'hat_esc', 'adult_hat_esc', 'adult_hat_removed', 'nat_by_rtn', 'hat_by_rtn', 'nob', 'hob', 'nob_spwn', 'hob_spwn', 'nos', 'hos', 'nat_smolt', 'hat_smolt', 'nat_harvest', 'hat_harvest')
