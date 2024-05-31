@@ -8,9 +8,9 @@
 #'
 
 
-nor_esc = 326 # 2024 pre season estimate
-hor_esc = 576 # 2024 pre-season estimate
-broodstock = 164
+# nor_esc = 326 # 2024 pre season estimate
+# hor_esc = 576 # 2024 pre-season estimate
+# broodstock = 164
 
 # calc_harvest(nor_esc = nor_esc, hor_esc = hor_esc, broodstock = broodstock)
 
